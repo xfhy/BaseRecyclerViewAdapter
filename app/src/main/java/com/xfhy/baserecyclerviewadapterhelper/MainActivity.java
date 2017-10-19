@@ -62,6 +62,8 @@ public class MainActivity extends AppCompatActivity {
         });
         mAdapter.addFooterView(footerView, 0);
 
+        mAdapter.openLoadAnimation(BaseQuickAdapter.SLIDEIN_TOP);
+        mAdapter.isFirstOnly(false);
         mRecyclerView.setAdapter(mAdapter);
         mAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
             @Override
@@ -78,6 +80,7 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
         });
+
     }
 
     /**
@@ -91,6 +94,19 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected void convert(BaseViewHolder holder, String item) {
             holder.setText(R.id.tv_list, item);
+            int layoutPosition = holder.getLayoutPosition();
+            switch (layoutPosition%3) {
+                case 0:
+                    holder.setBackgroundColor(R.id.tv_list,0xffEE82EE);
+                    break;
+                case 1:
+                    holder.setBackgroundColor(R.id.tv_list,0xffFFCE87);
+                    break;
+                case 2:
+                    holder.setBackgroundColor(R.id.tv_list,0xff85E6EE);
+                    break;
+            }
+
         }
     }
 
@@ -99,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private List<String> getData() {
         List<String> dataList = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 100; i++) {
             dataList.add(String.valueOf(i));
         }
         return dataList;
