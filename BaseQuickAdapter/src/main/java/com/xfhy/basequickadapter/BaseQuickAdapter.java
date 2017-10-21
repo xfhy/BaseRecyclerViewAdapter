@@ -7,7 +7,10 @@ import android.support.annotation.IntRange;
 import android.support.annotation.LayoutRes;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.StaggeredGridLayoutManager;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -22,6 +25,8 @@ import com.xfhy.basequickadapter.animation.SlideInBottomAnimation;
 import com.xfhy.basequickadapter.animation.SlideInLeftAnimation;
 import com.xfhy.basequickadapter.animation.SlideInRightAnimation;
 import com.xfhy.basequickadapter.animation.SlideInTopAnimation;
+import com.xfhy.basequickadapter.loadmore.LoadMoreView;
+import com.xfhy.basequickadapter.loadmore.SimpleLoadMoreView;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -31,6 +36,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -43,6 +49,33 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
  */
 public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends RecyclerView
         .Adapter<K> {
+
+    //load more
+    /**
+     * 可进行下一页加载
+     */
+    private boolean mNextLoadEnable = false;
+    /**
+     * 可进行加载更多
+     */
+    private boolean mLoadMoreEnable = false;
+    /**
+     * 当前加载状态 是否正在加载
+     */
+    private boolean mLoading = false;
+    /**
+     * 加载更多布局  默认是实现了一个简单布局,当然也可以自己实现
+     */
+    private LoadMoreView mLoadMoreView = new SimpleLoadMoreView();
+    /**
+     * 加载更多回调
+     */
+    private RequestLoadMoreListener mRequestLoadMoreListener;
+    private boolean mEnableLoadMoreEndClick = false;
+    /**
+     * 当列表滑动到倒数第N个Item的时候(默认是1)回调onLoadMoreRequested方法
+     */
+    private int mPreLoadNumber = 1;
 
     protected Context mContext;
     /**
@@ -132,6 +165,22 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
      */
     private BaseAnimation mSelectAnimation = new AlphaInAnimation();
 
+    private RecyclerView mRecyclerView;
+
+    protected RecyclerView getRecyclerView() {
+        return mRecyclerView;
+    }
+
+    private void setRecyclerView(RecyclerView recyclerView) {
+        mRecyclerView = recyclerView;
+    }
+
+    private void checkNotNull() {
+        if (getRecyclerView() == null) {
+            throw new RuntimeException("please bind recyclerView first!");
+        }
+    }
+
     /**
      * Same as QuickAdapter#QuickAdapter(Context,int) but with
      * some initialization data.
@@ -197,6 +246,7 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
         this.mLayoutInflater = LayoutInflater.from(mContext);
         switch (viewType) {
             case LOADING_VIEW:
+                baseViewHolder = getLoadingView(parent);
                 break;
             case HEADER_VIEW:
                 baseViewHolder = createBaseViewHolder(mHeaderLayout);
@@ -211,6 +261,44 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
                 bindViewClickListener(baseViewHolder);
         }
         return baseViewHolder;
+    }
+
+    private K getLoadingView(ViewGroup parent) {
+        //加载 加载布局
+        View view = getItemView(mLoadMoreView.getLayoutId(), parent);
+        //生成baseviewholder
+        K holder = createBaseViewHolder(view);
+        //设置加载布局的点击事件
+        holder.itemView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (mLoadMoreView.getLoadMoreStatus() == LoadMoreView.STATUS_FAIL) {
+                    //之前是加载失败状态时   前去刷新
+                    notifyLoadMoreToLoading();
+                }
+                if (mEnableLoadMoreEndClick && mLoadMoreView.getLoadMoreStatus() == LoadMoreView
+                        .STATUS_END) {
+                    //加载更多布局可以被点击  并且  之前状态是结束状态
+                    notifyLoadMoreToLoading();
+                }
+            }
+        });
+        return holder;
+    }
+
+    /**
+     * The notification starts the callback and loads more
+     * 通知启动回调并加载更多
+     */
+    public void notifyLoadMoreToLoading() {
+        //如果当前正在加载中,则不用管
+        if (mLoadMoreView.getLoadMoreStatus() == LoadMoreView.STATUS_LOADING) {
+            return;
+        }
+        //将加载更多布局的状态设置为默认状态  这样当下面刷新adapter时会回调onBindViewHolder()从而触发
+        //autoLoadMore()方法去判断是否需要加载更多,这时候刚好又是默认状态是可以更新的,于是就去回调onLoadMoreRequested()方法
+        mLoadMoreView.setLoadMoreStatus(LoadMoreView.STATUS_DEFAULT);
+        notifyItemChanged(getLoadMoreViewPosition());
     }
 
     /**
@@ -378,13 +466,17 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
 
     @Override
     public void onBindViewHolder(K holder, int position) {
+        //Do not move position, need to change before LoadMoreView binding
+        //判断是否需要进行上拉加载更多
+        autoLoadMore(position);
+
         int viewType = holder.getItemViewType();
         switch (viewType) {
             case 0:
                 convert(holder, getItem(position - getHeaderLayoutCount()));
                 break;
             case LOADING_VIEW:
-                //mLoadMoreView.convert(holder);
+                mLoadMoreView.convert(holder);
                 break;
             case HEADER_VIEW:
                 break;
@@ -401,7 +493,7 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
     @Override
     public int getItemCount() {
         int dataSize = mData == null ? 0 : mData.size();
-        return getHeaderLayoutCount() + dataSize + getFooterLayoutCount();
+        return getHeaderLayoutCount() + dataSize + getFooterLayoutCount() + getLoadMoreViewCount();
     }
 
     @Override
@@ -436,6 +528,7 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
                 if (adjPosition < numFooters) {
                     return FOOTER_VIEW;
                 } else {
+                    Log.e("xfhy", "LOADING_VIEW");
                     return LOADING_VIEW;
                 }
             }
@@ -784,8 +877,6 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
      * Called when a view created by this adapter has been attached to a window.
      * simple to solve item will layout using all
      *
-     *
-     *
      * @param holder
      */
     @Override
@@ -805,6 +896,7 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
     /**
      * add animation when you want to show time
      * 添加动画到item上并执行动画
+     *
      * @param holder
      */
     private void addAnimation(RecyclerView.ViewHolder holder) {
@@ -835,6 +927,7 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
     /**
      * set anim to start when loading
      * 开启动画并设置插值器
+     *
      * @param anim
      * @param index
      */
@@ -846,6 +939,7 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
     /**
      * Set the view animation type.
      * 设置动画类型
+     *
      * @param animationType One of {@link #ALPHAIN}, {@link #SCALEIN}, {@link #SLIDEIN_BOTTOM},
      *                      {@link #SLIDEIN_LEFT}, {@link #SLIDEIN_RIGHT}.
      */
@@ -882,6 +976,7 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
     /**
      * Set Custom ObjectAnimator
      * 自定义动画
+     *
      * @param animation ObjectAnimator
      */
     public void openLoadAnimation(BaseAnimation animation) {
@@ -902,11 +997,353 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
     /**
      * {@link #addAnimation(RecyclerView.ViewHolder)}
      * 设置动画是否只加载一次
+     *
      * @param firstOnly true just show anim when first loading false show anim when load the data
      *                  every time  true:第一次显示时才加载动画   false:每次都加载动画
      */
     public void isFirstOnly(boolean firstOnly) {
         this.mFirstOnlyEnable = firstOnly;
+    }
+
+    /**
+     * 设置当列表滑动到倒数第N个Item的时候(默认是1)回调onLoadMoreRequested()方法
+     *
+     * @param preLoadNumber
+     */
+    public void setPreLoadNumber(int preLoadNumber) {
+        if (preLoadNumber > 1) {
+            mPreLoadNumber = preLoadNumber;
+        }
+    }
+
+    /**
+     * 根据position位置判断当前是否需要进行加载更多
+     *
+     * @param position 当前onBindViewHolder()的Position
+     */
+    private void autoLoadMore(int position) {
+        // 判断是否可以进行加载更多的逻辑
+        if (getLoadMoreViewCount() == 0) {
+            return;
+        }
+        //只有在当前列表的倒数mPreLoadNumber个item开始绑定数据时才进行加载更多的逻辑
+        if (position < getItemCount() - mPreLoadNumber) {
+            return;
+        }
+        //判断当前加载状态,如果不是默认状态(可能正处于 正在加载中 的状态),则不进行加载
+        if (mLoadMoreView.getLoadMoreStatus() != LoadMoreView.STATUS_DEFAULT) {
+            return;
+        }
+        //设置当前状态:加载中
+        mLoadMoreView.setLoadMoreStatus(LoadMoreView.STATUS_LOADING);
+        if (!mLoading) {
+            mLoading = true;
+            if (getRecyclerView() != null) {
+                getRecyclerView().post(new Runnable() {
+                    @Override
+                    public void run() {
+                        //回调  让调用者去处理加载更多的逻辑
+                        mRequestLoadMoreListener.onLoadMoreRequested();
+                    }
+                });
+            } else {
+                mRequestLoadMoreListener.onLoadMoreRequested();
+            }
+        }
+    }
+
+    /**
+     * Load more view count
+     * 判断是否可以进行加载更多的逻辑
+     *
+     * @return 0 or 1
+     */
+    public int getLoadMoreViewCount() {
+        //参数合法性    加载更多状态
+        if (mRequestLoadMoreListener == null || !mLoadMoreEnable) {
+            return 0;
+        }
+        //可加载下一页               有无更多数据
+        if (!mNextLoadEnable && mLoadMoreView.isLoadEndMoreGone()) {
+            return 0;
+        }
+        //当前数据项个数
+        if (mData.size() == 0) {
+            return 0;
+        }
+        return 1;
+    }
+
+    /**
+     * bind recyclerView {@link #bindToRecyclerView(RecyclerView)} before use!
+     *
+     * @see #disableLoadMoreIfNotFullPage(RecyclerView)
+     */
+    public void disableLoadMoreIfNotFullPage() {
+        //检查当前RecyclerView是否为null
+        checkNotNull();
+        disableLoadMoreIfNotFullPage(getRecyclerView());
+    }
+
+    /**
+     * check if full page after {@link #setNewData(List)}, if full, it will enable load more again.
+     * <p>
+     * 不是配置项！！
+     * <p>
+     * 这个方法是用来检查是否满一屏的，所以只推荐在 {@link #setNewData(List)} 之后使用
+     * 原理:先关闭 load more，检查完了再决定是否开启
+     * 数据项个数未满一屏幕,则不开启load more
+     * 数据项个数 > 一屏幕,则继续开启load more
+     * <p>
+     * 不是配置项！！
+     *
+     * @param recyclerView your recyclerView
+     * @see #setNewData(List)
+     */
+    public void disableLoadMoreIfNotFullPage(RecyclerView recyclerView) {
+        // 设置加载状态为false
+        setEnableLoadMore(false);
+        if (recyclerView == null) return;
+        RecyclerView.LayoutManager manager = recyclerView.getLayoutManager();
+        if (manager == null) return;
+        if (manager instanceof LinearLayoutManager) {
+            final LinearLayoutManager linearLayoutManager = (LinearLayoutManager) manager;
+            recyclerView.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    //数据项个数 > 一屏幕,则继续开启load more
+                    if ((linearLayoutManager.findLastCompletelyVisibleItemPosition() + 1) !=
+                            getItemCount()) {
+                        setEnableLoadMore(true);
+                    }
+                }
+            }, 50);
+        } else if (manager instanceof StaggeredGridLayoutManager) {
+            final StaggeredGridLayoutManager staggeredGridLayoutManager =
+                    (StaggeredGridLayoutManager) manager;
+            recyclerView.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    //返回StaggeredGridLayoutManager布局的跨度数
+                    final int[] positions = new int[staggeredGridLayoutManager.getSpanCount()];
+                    //返回每一个跨度(列)的最后一个可见的item的位置  赋值到该数组里面
+                    staggeredGridLayoutManager.findLastCompletelyVisibleItemPositions(positions);
+                    //找出数组中最大的数(即StaggeredGridLayoutManager布局的当前可见的最下面那个item)
+                    int pos = getTheBiggestNumber(positions) + 1;
+                    // 数据项个数 > 一屏幕,则继续开启load more
+                    if (pos != getItemCount()) {
+                        setEnableLoadMore(true);
+                    }
+                }
+            }, 50);
+        }
+    }
+
+    /**
+     * Set the enabled state of load more.
+     * 设置上拉加载更多是否可用
+     *
+     * @param enable True if load more is enabled, false otherwise.
+     */
+    public void setEnableLoadMore(boolean enable) {
+        //之前的状态需要和现在的状态做对比
+        int oldLoadMoreCount = getLoadMoreViewCount();
+        mLoadMoreEnable = enable;
+        int newLoadMoreCount = getLoadMoreViewCount();
+
+        if (oldLoadMoreCount == 1) {
+            if (newLoadMoreCount == 0) {
+                //之前有 现在没有 需要移除
+                notifyItemRemoved(getLoadMoreViewPosition());
+            }
+        } else {
+            if (newLoadMoreCount == 1) {
+                //将加载布局插入
+                mLoadMoreView.setLoadMoreStatus(LoadMoreView.STATUS_DEFAULT);
+                notifyItemInserted(getLoadMoreViewPosition());
+            }
+        }
+    }
+
+    /**
+     * 返回数组中的最大值
+     *
+     * @param numbers
+     * @return
+     */
+    private int getTheBiggestNumber(int[] numbers) {
+        int tmp = -1;
+        if (numbers == null || numbers.length == 0) {
+            return tmp;
+        }
+        for (int num : numbers) {
+            if (num > tmp) {
+                tmp = num;
+            }
+        }
+        return tmp;
+    }
+
+    /**
+     * Refresh complete
+     * 刷新完成时调用
+     */
+    public void loadMoreComplete() {
+        if (getLoadMoreViewCount() == 0) {
+            return;
+        }
+        //将当前加载状态改为false  表示未在加载
+        mLoading = false;
+        //可进行下一页加载
+        mNextLoadEnable = true;
+        // 恢复加载更多布局的状态
+        mLoadMoreView.setLoadMoreStatus(LoadMoreView.STATUS_DEFAULT);
+        // 告知加载更多布局被更新了,需要刷新一下
+        notifyItemChanged(getLoadMoreViewPosition());
+    }
+
+    /**
+     * Gets to load more locations
+     * 获取加载更多的布局的索引
+     *
+     * @return
+     */
+    public int getLoadMoreViewPosition() {
+        return getHeaderLayoutCount() + mData.size() + getFooterLayoutCount();
+    }
+
+    /**
+     * Refresh failed
+     * 加载失败
+     */
+    public void loadMoreFail() {
+        if (getLoadMoreViewCount() == 0) {
+            return;
+        }
+        //当前加载状态  切换为未在加载中
+        mLoading = false;
+        //加载布局设置为加载失败
+        mLoadMoreView.setLoadMoreStatus(LoadMoreView.STATUS_FAIL);
+        //通知加载布局更新了,需要刷新
+        notifyItemChanged(getLoadMoreViewPosition());
+    }
+
+    /**
+     * Refresh end, no more data
+     * 加载更多,并且没有更多数据了    调用此方法即表示无更多数据了
+     * 这里设置加载更多布局依然可见
+     */
+    public void loadMoreEnd() {
+        loadMoreEnd(false);
+    }
+
+    /**
+     * Refresh end, no more data
+     * 加载更多,并且没有更多数据了   调用此方法即表示无更多数据了
+     * gone:设置加载更多布局是否可见   true:不可见   false:可见
+     *
+     * @param gone if true gone the load more view
+     */
+    public void loadMoreEnd(boolean gone) {
+        if (getLoadMoreViewCount() == 0) {
+            return;
+        }
+        ////当前加载状态  切换为未在加载中
+        mLoading = false;
+        //不能再加载下一页了  因为已经没有更多数据了
+        mNextLoadEnable = false;
+        //设置加载更多布局是否可见
+        mLoadMoreView.setLoadMoreEndGone(gone);
+        if (gone) {
+            //如果布局不可见,则更新
+            notifyItemRemoved(getLoadMoreViewPosition());
+        } else {
+            //如果布局可见,则先更新布局(切换为STATUS_END状态那种布局)
+            mLoadMoreView.setLoadMoreStatus(LoadMoreView.STATUS_END);
+            //并更新adapter
+            notifyItemChanged(getLoadMoreViewPosition());
+        }
+    }
+
+    /**
+     * 设置监听RecyclerView上拉加载更多  并设置监听器
+     *
+     * @param requestLoadMoreListener
+     * @param recyclerView
+     */
+    public void setOnLoadMoreListener(RequestLoadMoreListener requestLoadMoreListener,
+                                      RecyclerView recyclerView) {
+        openLoadMore(requestLoadMoreListener);
+        if (getRecyclerView() == null) {
+            setRecyclerView(recyclerView);
+        }
+    }
+
+    /**
+     * 开启上拉加载更多
+     *
+     * @param requestLoadMoreListener
+     */
+    private void openLoadMore(RequestLoadMoreListener requestLoadMoreListener) {
+        this.mRequestLoadMoreListener = requestLoadMoreListener;
+        mNextLoadEnable = true;
+        mLoadMoreEnable = true;
+        mLoading = false;
+    }
+
+    /**
+     * add new data in to certain location
+     *
+     * @param position the insert position
+     * @param newData  the new data collection
+     */
+    public void addData(@IntRange(from = 0) int position, @NonNull Collection<? extends T>
+            newData) {
+        mData.addAll(position, newData);
+        notifyItemRangeInserted(position + getHeaderLayoutCount(), newData.size());
+        compatibilityDataSizeChanged(newData.size());
+    }
+
+    /**
+     * add new data to the end of mData
+     *
+     * @param newData the new data collection
+     */
+    public void addData(@NonNull Collection<? extends T> newData) {
+        mData.addAll(newData);
+        notifyItemRangeInserted(mData.size() - newData.size() + getHeaderLayoutCount(), newData
+                .size());
+        compatibilityDataSizeChanged(newData.size());
+    }
+
+    /**
+     * compatible getLoadMoreViewCount and getEmptyViewCount may change
+     *
+     * @param size Need compatible data size
+     */
+    private void compatibilityDataSizeChanged(int size) {
+        final int dataSize = mData == null ? 0 : mData.size();
+        if (dataSize == size) {
+            notifyDataSetChanged();
+        }
+    }
+
+    /**
+     * setting up a new instance to data;
+     * 设置新数据
+     *
+     * @param data
+     */
+    public void setNewData(@Nullable List<T> data) {
+        this.mData = data == null ? new ArrayList<T>() : data;
+        if (mRequestLoadMoreListener != null) {
+            mNextLoadEnable = true;
+            mLoadMoreEnable = true;
+            mLoading = false;
+            mLoadMoreView.setLoadMoreStatus(LoadMoreView.STATUS_DEFAULT);
+        }
+        mLastPosition = -1;
+        notifyDataSetChanged();
     }
 
     /**
@@ -962,6 +1399,12 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
          * @return 是否消费
          */
         boolean onItemLongClick(BaseQuickAdapter adapter, View view, int position);
+    }
+
+    public interface RequestLoadMoreListener {
+
+        void onLoadMoreRequested();
+
     }
 
 }
