@@ -5,6 +5,7 @@ import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.DividerItemDecoration;
+import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
@@ -39,10 +40,12 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             }
         });
-        LinearLayoutManager linearLayoutManager = new LinearLayoutManager(this);
-        mRecyclerView.setLayoutManager(linearLayoutManager);
-        mRecyclerView.addItemDecoration(new DividerItemDecoration(this, linearLayoutManager.getOrientation
-                ()));
+        //LinearLayoutManager linearLayoutManager = new LinearLayoutManager(this);
+        GridLayoutManager gridLayoutManager = new GridLayoutManager(this, 2);
+        mRecyclerView.setLayoutManager(gridLayoutManager);
+//        mRecyclerView.addItemDecoration(new DividerItemDecoration(this, linearLayoutManager
+// .getOrientation
+//                ()));
         mAdapter = new MyAdapter(R.layout.item_list,getData());
 
         View headerView = getHeaderView(0, new View.OnClickListener() {

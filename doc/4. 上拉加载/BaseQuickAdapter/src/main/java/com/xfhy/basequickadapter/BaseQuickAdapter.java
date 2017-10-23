@@ -7,7 +7,6 @@ import android.support.annotation.IntRange;
 import android.support.annotation.LayoutRes;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.StaggeredGridLayoutManager;
@@ -107,14 +106,6 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
     //header footer
     private LinearLayout mHeaderLayout;
     private LinearLayout mFooterLayout;
-    /**
-     * if asFlow is true, footer/header will arrange like normal item view.
-     * only works when use {@link GridLayoutManager},and it will ignore span size.
-     * 如果asFlow是true的话,那么footer和header就像正常item一样,不会跨区域
-     * 默认是false,header和footer都占满屏幕
-     */
-    private boolean headerViewAsFlow, footerViewAsFlow;
-    private SpanSizeLookup mSpanSizeLookup;
 
     //Animation
     /**
@@ -211,8 +202,6 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
     public BaseQuickAdapter(@LayoutRes int layoutResId) {
         this(layoutResId, null);
     }
-
-    /*--------------------------header-footer----------------------------------*/
 
     /**
      * if addHeaderView will be return 1, if not will be return 0
@@ -810,111 +799,6 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
     }
 
     /**
-     * 设置header不跨区域  就像正常item
-     * true:不跨区域   false:跨区域
-     */
-    public void setHeaderViewAsFlow(boolean headerViewAsFlow) {
-        this.headerViewAsFlow = headerViewAsFlow;
-    }
-
-    public boolean isHeaderViewAsFlow() {
-        return headerViewAsFlow;
-    }
-
-    /**
-     * 设置footer不跨区域  就像正常item
-     * true:不跨区域   false:跨区域
-     */
-    public void setFooterViewAsFlow(boolean footerViewAsFlow) {
-        this.footerViewAsFlow = footerViewAsFlow;
-    }
-
-    public boolean isFooterViewAsFlow() {
-        return footerViewAsFlow;
-    }
-
-    /**
-     * 判断当前type是否是特殊的type
-     */
-    protected boolean isFixedViewType(int type) {
-        return type == EMPTY_VIEW || type == HEADER_VIEW || type == FOOTER_VIEW || type ==
-                LOADING_VIEW;
-    }
-
-    /**
-     * RecyclerView在开始观察该适配器时调用。
-     * 请记住，多个RecyclerView可能会观察到相同的适配器。
-     * <p>
-     * Adapter与RecyclerView关联起来
-     * 这里面主要是做表格布局管理器的头布局和脚布局自占一行的适配
-     *
-     * @param recyclerView
-     */
-    @Override
-    public void onAttachedToRecyclerView(final RecyclerView recyclerView) {
-        super.onAttachedToRecyclerView(recyclerView);
-        RecyclerView.LayoutManager manager = recyclerView.getLayoutManager();
-        if (manager instanceof GridLayoutManager) {
-            final GridLayoutManager gridManager = ((GridLayoutManager) manager);
-            //设置adapter中每个Item所占用的跨度数
-            gridManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
-                @Override
-                public int getSpanSize(int position) {
-                    int type = getItemViewType(position);
-
-                    //如果当前type为header并且asFlow为true:那么header设置为不跨区域,就和正常item一样.只占1格
-                    if (type == HEADER_VIEW && isHeaderViewAsFlow()) {
-                        return 1;
-                    }
-                    if (type == FOOTER_VIEW && isFooterViewAsFlow()) {
-                        return 1;
-                    }
-
-                    //如果用户没有自定义SpanSizeLookup  SpanSizeLookup是用来查询每个item占用的跨度数的实例
-                    if (mSpanSizeLookup == null) {
-                        /*
-                        1.如果是特殊的type,那么item的跨度设置为当前gridManager的SpanCount
-                        即如果我设置的是mRecyclerView.setLayoutManager(new GridLayoutManager(this,2));
-                        那么当前item占2格的跨度
-                        2.如果item不是特殊的item,那么就是占1个格子,不跨
-                        */
-                        return isFixedViewType(type) ? gridManager.getSpanCount() : 1;
-                    } else {
-                        /*
-                        1.如果是特殊的type,那么item的跨度设置为当前gridManager的SpanCount
-                        即如果我设置的是mRecyclerView.setLayoutManager(new GridLayoutManager(this,2));
-                        那么当前item占2格的跨度
-                        2.如果item不是特殊的item,那么交给外部调用者来处理每个item应该占多少个格
-                        */
-                        return isFixedViewType(type) ? gridManager.getSpanCount() :
-                                mSpanSizeLookup.getSpanSize(gridManager,
-                                        position - getHeaderLayoutCount());
-                    }
-                }
-
-
-            });
-        }
-    }
-
-    /**
-     * 用于外部调用者设置每个item的跨度,除了header,footer,emptyView,loadMoreView
-     */
-    public interface SpanSizeLookup {
-        int getSpanSize(GridLayoutManager gridLayoutManager, int position);
-    }
-
-    /**
-     * @param spanSizeLookup instance to be used to query number of spans occupied by each item
-     *                       用于查询每个item占用的跨度数的实例
-     */
-    public void setSpanSizeLookup(SpanSizeLookup spanSizeLookup) {
-        this.mSpanSizeLookup = spanSizeLookup;
-    }
-
-    /*-------------------data操作-----------------------------*/
-
-    /**
      * Get the data of list
      *
      * @return 列表数据
@@ -933,7 +817,10 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
      */
     @Nullable
     public T getItem(@IntRange(from = 0) int position) {
-        return position < mData.size() ? mData.get(position) : null;
+        if (position < mData.size())
+            return mData.get(position);
+        else
+            return null;
     }
 
     /**
@@ -977,69 +864,6 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
         mData.add(position, item);
         notifyItemInserted(position);
     }
-
-    /**
-     * add new data in to certain location
-     * 添加一个集合的数据
-     *
-     * @param position the insert position
-     * @param newData  the new data collection
-     */
-    public void addData(@IntRange(from = 0) int position, @NonNull Collection<? extends T>
-            newData) {
-        mData.addAll(position, newData);
-        notifyItemRangeInserted(position + getHeaderLayoutCount(), newData.size());
-        compatibilityDataSizeChanged(newData.size());
-    }
-
-    /**
-     * add new data to the end of mData
-     * 添加数据到末尾
-     *
-     * @param newData the new data collection
-     */
-    public void addData(@NonNull Collection<? extends T> newData) {
-        mData.addAll(newData);
-        notifyItemRangeInserted(mData.size() - newData.size() + getHeaderLayoutCount(), newData
-                .size());
-        compatibilityDataSizeChanged(newData.size());
-    }
-
-    /**
-     * compatible getLoadMoreViewCount and getEmptyViewCount may change
-     * 判断loadMoreView和emptyView是否已经变化
-     *
-     * @param size Need compatible data size
-     */
-    private void compatibilityDataSizeChanged(int size) {
-        final int dataSize = mData == null ? 0 : mData.size();
-        if (dataSize == size) {
-            notifyDataSetChanged();
-        }
-    }
-
-    /**
-     * setting up a new instance to data;
-     * 设置新数据
-     *
-     * @param data
-     */
-    public void setNewData(@Nullable List<T> data) {
-        this.mData = data == null ? new ArrayList<T>() : data;
-
-        //如果当前设置了加载更多监听器
-        if (mRequestLoadMoreListener != null) {
-            // 状态切换为可加载下一页
-            mNextLoadEnable = true;
-            mLoadMoreEnable = true;
-            mLoading = false;
-            mLoadMoreView.setLoadMoreStatus(LoadMoreView.STATUS_DEFAULT);
-        }
-        mLastPosition = -1;
-        notifyDataSetChanged();
-    }
-
-    /*---------------------动画-----------------------*/
 
     /**
      * up fetch end
@@ -1207,8 +1031,6 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
         this.mFirstOnlyEnable = firstOnly;
     }
 
-    /*---------------------------------上拉加载更多--------------------------------------*/
-
     /**
      * 设置当列表滑动到倒数第N个Item的时候(默认是1)回调onLoadMoreRequested()方法
      *
@@ -1293,17 +1115,6 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
             return 0;
         }
         return 1;
-    }
-
-    /**
-     * same as recyclerView.setAdapter(), and save the instance of recyclerView
-     */
-    public void bindToRecyclerView(RecyclerView recyclerView) {
-        if (getRecyclerView() != null) {
-            throw new RuntimeException("Don't bind twice");
-        }
-        setRecyclerView(recyclerView);
-        getRecyclerView().setAdapter(this);
     }
 
     /**
@@ -1523,6 +1334,60 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
         mLoading = false;
     }
 
+    /**
+     * add new data in to certain location
+     *
+     * @param position the insert position
+     * @param newData  the new data collection
+     */
+    public void addData(@IntRange(from = 0) int position, @NonNull Collection<? extends T>
+            newData) {
+        mData.addAll(position, newData);
+        notifyItemRangeInserted(position + getHeaderLayoutCount(), newData.size());
+        compatibilityDataSizeChanged(newData.size());
+    }
+
+    /**
+     * add new data to the end of mData
+     *
+     * @param newData the new data collection
+     */
+    public void addData(@NonNull Collection<? extends T> newData) {
+        mData.addAll(newData);
+        notifyItemRangeInserted(mData.size() - newData.size() + getHeaderLayoutCount(), newData
+                .size());
+        compatibilityDataSizeChanged(newData.size());
+    }
+
+    /**
+     * compatible getLoadMoreViewCount and getEmptyViewCount may change
+     *
+     * @param size Need compatible data size
+     */
+    private void compatibilityDataSizeChanged(int size) {
+        final int dataSize = mData == null ? 0 : mData.size();
+        if (dataSize == size) {
+            notifyDataSetChanged();
+        }
+    }
+
+    /**
+     * setting up a new instance to data;
+     * 设置新数据
+     *
+     * @param data
+     */
+    public void setNewData(@Nullable List<T> data) {
+        this.mData = data == null ? new ArrayList<T>() : data;
+        if (mRequestLoadMoreListener != null) {
+            mNextLoadEnable = true;
+            mLoadMoreEnable = true;
+            mLoading = false;
+            mLoadMoreView.setLoadMoreStatus(LoadMoreView.STATUS_DEFAULT);
+        }
+        mLastPosition = -1;
+        notifyDataSetChanged();
+    }
 
     /**
      * 设置item点击事件
@@ -1579,14 +1444,10 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
         boolean onItemLongClick(BaseQuickAdapter adapter, View view, int position);
     }
 
-    /**
-     * 加载更多监听器
-     */
     public interface RequestLoadMoreListener {
-        /**
-         * 当需要加载更多时会被调用
-         */
+
         void onLoadMoreRequested();
+
     }
 
 }
