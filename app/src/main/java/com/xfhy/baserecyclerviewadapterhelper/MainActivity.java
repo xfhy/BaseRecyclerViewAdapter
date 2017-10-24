@@ -1,12 +1,10 @@
 package com.xfhy.baserecyclerviewadapterhelper;
 
+import android.os.Bundle;
 import android.support.annotation.LayoutRes;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
-import android.support.v7.widget.DividerItemDecoration;
 import android.support.v7.widget.GridLayoutManager;
-import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -51,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
         View headerView = getHeaderView(0, new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                Toast.makeText(MainActivity.this, "哈哈", Toast.LENGTH_SHORT).show();
                 mAdapter.addHeaderView(getHeaderView(1, getRemoveHeaderListener()), 0);
             }
         });
@@ -65,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
         });
         mAdapter.addFooterView(footerView, 0);
 
-        mAdapter.openLoadAnimation(BaseQuickAdapter.SLIDEIN_TOP);
+        mAdapter.openLoadAnimation(BaseQuickAdapter.SLIDEIN_LEFT);
         mAdapter.isFirstOnly(false);
         mRecyclerView.setAdapter(mAdapter);
         mAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {

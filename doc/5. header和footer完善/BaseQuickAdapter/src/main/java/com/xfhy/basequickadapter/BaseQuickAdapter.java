@@ -546,7 +546,7 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
         }
     }
 
-    protected int getDefItemViewType(int position) {
+    private int getDefItemViewType(int position) {
         return super.getItemViewType(position);
     }
 
