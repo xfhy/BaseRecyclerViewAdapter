@@ -15,6 +15,9 @@
         <activity android:name=".PullToRefreshUseActivity">
         </activity>
         <activity android:name=".SectionActivity">
+
+        </activity>
+        <activity android:name=".MultipleItemUseActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
 
