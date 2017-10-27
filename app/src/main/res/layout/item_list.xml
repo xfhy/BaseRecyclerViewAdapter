@@ -3,6 +3,7 @@
           android:id="@+id/tv_list"
           android:layout_width="match_parent"
           android:layout_height="200dp"
+          android:background="#b4f97f"
           android:gravity="center"
           android:text="1"
           android:textColor="@color/colorAccent"

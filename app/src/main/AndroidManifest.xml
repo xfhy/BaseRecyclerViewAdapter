@@ -10,14 +10,15 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity android:name=".MainActivity">
-
         </activity>
         <activity android:name=".PullToRefreshUseActivity">
         </activity>
         <activity android:name=".SectionActivity">
-
         </activity>
         <activity android:name=".MultipleItemUseActivity">
+
+        </activity>
+        <activity android:name=".EmptyActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
 
