@@ -56,7 +56,7 @@ public class PullToRefreshUseActivity extends AppCompatActivity implements BaseQ
         }).start();
 
 
-        pullToRefreshAdapter.loadMoreFail();
+        pullToRefreshAdapter.loadMoreComplete();
 
     }
 

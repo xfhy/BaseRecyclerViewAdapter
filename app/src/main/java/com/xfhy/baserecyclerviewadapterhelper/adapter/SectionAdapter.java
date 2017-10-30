@@ -1,5 +1,7 @@
 package com.xfhy.baserecyclerviewadapterhelper.adapter;
 
+import android.view.View;
+
 import com.xfhy.basequickadapter.BaseSectionQuickAdapter;
 import com.xfhy.basequickadapter.BaseViewHolder;
 import com.xfhy.baserecyclerviewadapterhelper.R;

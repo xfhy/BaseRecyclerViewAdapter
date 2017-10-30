@@ -841,7 +841,7 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
 
     /**
      * 设置header不跨区域  就像正常item
-     * true:不跨区域   false:跨区域
+     * true:不跨区域(不占满一行)   false:跨区域(占满一行)
      */
     public void setHeaderViewAsFlow(boolean headerViewAsFlow) {
         this.headerViewAsFlow = headerViewAsFlow;
@@ -1553,7 +1553,7 @@ public abstract class BaseQuickAdapter<T, K extends BaseViewHolder> extends Recy
     /**
      * Refresh end, no more data
      * 加载更多,并且没有更多数据了    调用此方法即表示无更多数据了
-     * 这里设置加载更多布局依然可见
+     * 这里设置加载更多布局(默认布局是显示:客官,没有更多数据了~)依然可见
      */
     public void loadMoreEnd() {
         loadMoreEnd(false);
