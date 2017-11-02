@@ -1,4 +1,4 @@
-package com.xfhy.basequickadapter.entity;
+package com.xfhy.androidbasiclibs.uihelper.adapter.entity;
 
 import java.io.Serializable;
 
@@ -20,6 +20,9 @@ public class SectionEntity<T> implements Serializable{
      * 分组header标题
      */
     public String header;
+
+    public SectionEntity() {
+    }
 
     /**
      * @param isHeader true:是分组header false:不是

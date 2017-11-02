@@ -223,45 +223,41 @@ mQuickAdapter.setEnableLoadMore(boolean);
 
 实体类必须继承SectionEntity
 ```java
-public class MySection extends SectionEntity<Video> {
-    private boolean isMore;
-    public MySection(boolean isHeader, String header) {
-        super(isHeader, header);
+public class StoriesBean extends SectionEntity {
+    private List<String> images;
+    public StoriesBean() {
     }
 
-    public MySection(Video t) {
-        super(t);
-    }
+	public StoriesBean(boolean isHeader) {
+		super(isHeader);
+	}
 }
 ```
 
 adapter构造需要传入两个布局id，第一个是item的，第二个是head的，在convert方法里面加载item数据，在convertHead方法里面加载head数据
 ```java
-public class SectionAdapter extends BaseSectionQuickAdapter<MySection, BaseViewHolder> {
-    public SectionAdapter(int layoutResId, int sectionHeadResId, List<MySection> data) {
-        super(layoutResId, sectionHeadResId, data);
+public class ZhihuLatestDailyAdapter extends BaseSectionQuickAdapter<LatestDailyListBean
+        .StoriesBean,
+        BaseViewHolder> {
+    private Context context;
+
+    public ZhihuLatestDailyAdapter(@NonNull Context context, @Nullable List<LatestDailyListBean
+            .StoriesBean> data) {
+        super(R.layout.item_latest_daily, R.layout.header_latest_daily, data);
+        this.context = context;
     }
 
     @Override
-    protected void convertHead(BaseViewHolder helper, MySection item) {
-        helper.setText(R.id.header, item.header);
+    protected void convertHead(BaseViewHolder helper, LatestDailyListBean.StoriesBean item) {
+        helper.setText(R.id.tv_latest_header, item.header);
     }
 
     @Override
-    protected void convert(BaseViewHolder holder, MySection item) {
-        int layoutPosition = holder.getLayoutPosition();
-        switch (layoutPosition % 3) {
-            case 0:
-                holder.setBackgroundColor(R.id.tv_list, 0xffEE82EE);
-                break;
-            case 1:
-                holder.setBackgroundColor(R.id.tv_list, 0xffFFCE87);
-                break;
-            case 2:
-                holder.setBackgroundColor(R.id.tv_list, 0xff85E6EE);
-                break;
+    protected void convert(BaseViewHolder holder, LatestDailyListBean.StoriesBean item) {
+        if (item == null) {
+            return;
         }
-        holder.setText(R.id.tv_list, item.getItemContent());
+        holder.setText(R.id.tv_news_title_latest, item.getTitle());
     }
 }
 
