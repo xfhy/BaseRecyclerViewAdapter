@@ -1,4 +1,4 @@
-package com.xfhy.androidbasiclibs.uihelper.adapter.entity;
+package com.xfhy.basequickadapter.entity;
 
 import java.io.Serializable;
 
