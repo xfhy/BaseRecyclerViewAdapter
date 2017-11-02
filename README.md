@@ -24,7 +24,7 @@ allprojects {
 **Step 2**. Add the dependency
 ```gradle
 dependencies {
-    compile 'com.github.xfhy:BaseRecyclerViewAdapter:v1.0'
+    compile 'com.github.xfhy:BaseRecyclerViewAdapter:v1.2'
 }
 ```
 
